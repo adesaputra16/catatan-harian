@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#6750a4" />
+  <meta name="description" content="Aplikasi catatan harian sederhana yang bekerja offline (PWA)." />
+
+  <title>Catatan Harian</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="app-bar">
+      <div class="app-bar__title">
+        <span class="app-bar__logo">📔</span>
+        <div class="app-bar__titles">
+          <h1>Catatan Harian</h1>
+          <p class="app-bar__sub" id="dateSub"></p>
+        </div>
+      </div>
+      <div class="app-bar__actions">
+        <button id="notifBtn" class="icon-btn" title="Aktifkan notifikasi">🔕</button>
+        <button id="exportBtn" class="icon-btn" title="Ekspor data">📤</button>
+        <button id="importBtn" class="icon-btn" title="Impor data">📥</button>
+        <button id="installBtn" class="icon-btn" title="Pasang aplikasi" hidden>⬇️</button>
+      </div>
+    </header>
+
+    <!-- Offline indicator -->
+    <div id="offlineBar" class="offline-bar" hidden>📴 Mode offline — catatan tetap tersimpan di perangkat ini</div>
+
+    <!-- Search -->
+    <div class="search">
+      <input id="searchInput" type="search" placeholder="🔍 Cari catatan…" autocomplete="off" />
+    </div>
+
+    <!-- Notes list -->
+    <main id="notesList" class="notes"></main>
+
+    <!-- Empty state -->
+    <div id="emptyState" class="empty" hidden>
+      <div class="empty__art">🪶</div>
+      <p class="empty__title">Belum ada catatan</p>
+      <p class="empty__sub">Ketuk tombol + untuk menulis catatan pertamamu hari ini.</p>
+    </div>
+
+    <!-- Bilah navigasi bawah (mobile) -->
+    <nav class="bottom-bar">
+      <button id="themeBtn" class="bar-btn" title="Mode gelap / terang">🌙</button>
+      <button id="shalatBtn" class="bar-btn" title="Jadwal Shalat">🕌</button>
+      <button id="fab" class="fab" title="Tulis catatan baru" aria-label="Tulis catatan baru">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button id="financeBtn" class="bar-btn" title="Keuangan">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+        </svg>
+      </button>
+      <button id="btBtn" class="bar-btn" title="Bluetooth">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
+        </svg>
+      </button>
+    </nav>
+
+    <!-- Popup pasang ke layar utama -->
+    <div id="installCard" class="install-card" hidden>
+      <div class="install-card__icon">
+        <img src="icons/icon.svg" alt="" width="48" height="48" />
+      </div>
+      <div class="install-card__text">
+        <strong>Pasang Catatan Harian</strong>
+        <span>Buka dari layar utama, lebih cepat & tetap jalan offline.</span>
+      </div>
+      <div class="install-card__actions">
+        <button id="installLater" class="text-btn">Nanti</button>
+        <button id="installNow" class="btn-filled">Pasang</button>
+      </div>
+    </div>
+
+    <!-- Panduan pasang untuk iOS / Safari (tanpa prompt otomatis) -->
+    <div id="iosGuide" class="ios-guide" hidden>
+      <div class="ios-guide__sheet">
+        <div class="ios-guide__icon"><img src="icons/icon.svg" alt="" width="56" height="56" /></div>
+        <h2>Pasang ke Layar Utama</h2>
+        <p>Untuk memasang aplikasi ini di iPhone/iPad:</p>
+        <ol>
+          <li>Ketuk tombol <strong>Bagikan</strong> <span class="ios-share">⎙</span> di bilah Safari.</li>
+          <li>Pilih <strong>“Tambahkan ke Layar Utama”</strong> <span>➕</span>.</li>
+          <li>Ketuk <strong>Tambah</strong> di pojok kanan atas.</li>
+        </ol>
+        <button id="iosGuideClose" class="btn-filled btn-filled--block">Mengerti</button>
+      </div>
+    </div>
+
+    <!-- Editor (modal) -->
+    <div id="editor" class="editor" hidden>
+      <div class="editor__sheet">
+        <div class="editor__head">
+          <button id="cancelBtn" class="text-btn">Batal</button>
+          <span id="editorDate" class="editor__date"></span>
+          <button id="saveBtn" class="text-btn text-btn--primary">Simpan</button>
+        </div>
+
+        <div class="editor__moods" id="moodPicker">
+          <button type="button" data-mood="😀">😀</button>
+          <button type="button" data-mood="🙂">🙂</button>
+          <button type="button" data-mood="😐">😐</button>
+          <button type="button" data-mood="😔">😔</button>
+          <button type="button" data-mood="😡">😡</button>
+          <button type="button" data-mood="😴">😴</button>
+          <button type="button" data-mood="🥳">🥳</button>
+        </div>
+
+        <input id="titleInput" class="editor__title" type="text" placeholder="Judul (opsional)" />
+        <textarea id="bodyInput" class="editor__body" placeholder="Apa yang terjadi hari ini?"></textarea>
+
+        <!-- Lampiran foto -->
+        <div id="imagePreview" class="image-preview"></div>
+        <button type="button" id="cameraBtn" class="camera-add-btn">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          Tambah Foto
+        </button>
+        <input id="cameraInput" type="file" accept="image/*" multiple hidden />
+
+        <button id="deleteBtn" class="delete-btn" hidden>🗑️ Hapus catatan</button>
+      </div>
+    </div>
+
+    <input id="importFile" type="file" accept="application/json" hidden />
+
+    <!-- ===================== HALAMAN JADWAL SHALAT ===================== -->
+    <div id="shalatPage" class="shalat-page" hidden>
+
+      <!-- Header shalat -->
+      <header class="shalat-bar">
+        <button id="shalatBackBtn" class="icon-btn" title="Kembali">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="shalat-bar__info">
+          <h2>Jadwal Shalat</h2>
+          <p id="shalatCityLabel" class="shalat-bar__city">Pilih lokasi terlebih dahulu</p>
+        </div>
+        <button id="shalatLocBtn" class="icon-btn" title="Ubah lokasi">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </button>
+      </header>
+
+      <!-- Hero: waktu shalat hari ini -->
+      <div class="shalat-hero" id="shalatHero" hidden>
+        <div class="shalat-hero__date" id="shalatHeroDate"></div>
+        <div class="shalat-next-badge" id="shalatNextBadge"></div>
+        <div class="shalat-grid" id="shalatGrid"></div>
+      </div>
+
+      <!-- Pemilih lokasi -->
+      <div id="shalatLocPicker" class="shalat-loc-picker" hidden>
+        <p class="shalat-loc-picker__label">Pilih Lokasi</p>
+
+        <!-- Tombol GPS otomatis -->
+        <button id="shalatGpsBtn" class="gps-btn">
+          <svg id="shalatGpsIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+            <line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+            <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+          </svg>
+          <span id="shalatGpsLabel">Gunakan Lokasi GPS</span>
+        </button>
+        <p id="shalatGpsStatus" class="gps-status" hidden></p>
+
+        <div class="shalat-or"><span>atau pilih manual</span></div>
+
+        <div class="shalat-select-wrap">
+          <select id="provinsiSelect" class="shalat-select">
+            <option value="">— Pilih Provinsi —</option>
+          </select>
+          <svg class="shalat-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="shalat-select-wrap">
+          <select id="kabkotaSelect" class="shalat-select" disabled>
+            <option value="">— Pilih Kab/Kota —</option>
+          </select>
+          <svg class="shalat-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <button id="shalatApplyBtn" class="btn-filled btn-filled--block" disabled>Tampilkan Jadwal</button>
+      </div>
+
+      <!-- Loading -->
+      <div id="shalatLoading" class="shalat-loading" hidden>
+        <div class="shalat-spinner"></div>
+        <span>Memuat jadwal…</span>
+      </div>
+
+      <!-- Empty state -->
+      <div id="shalatEmpty" class="shalat-empty">
+        <div class="shalat-empty__art">🕌</div>
+        <p class="shalat-empty__title">Jadwal Shalat</p>
+        <p class="shalat-empty__sub">Izinkan akses lokasi atau pilih kota secara manual.</p>
+        <button id="shalatGpsBtnEmpty" class="btn-filled">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="vertical-align:middle;margin-right:6px">
+            <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
+            <line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+            <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+          </svg>
+          Deteksi Lokasi Otomatis
+        </button>
+        <button id="shalatPickLocBtn" class="text-btn text-btn--primary" style="font-size:14px">📍 Pilih Lokasi Manual</button>
+      </div>
+
+      <!-- Tabel bulanan -->
+      <div id="shalatMonth" class="shalat-month" hidden>
+        <div class="shalat-month__head">
+          <button id="shalatPrevMonth" class="icon-btn shalat-nav-btn">&#8249;</button>
+          <span id="shalatMonthLabel" class="shalat-month__label"></span>
+          <button id="shalatNextMonth" class="icon-btn shalat-nav-btn">&#8250;</button>
+        </div>
+        <div class="shalat-table-wrap">
+          <table class="shalat-table" id="shalatTable"></table>
+        </div>
+      </div>
+
+    </div>
+    <!-- ===================== END SHALAT PAGE ===================== -->
+
+    <!-- ===================== HALAMAN KEUANGAN ===================== -->
+    <div id="financePage" class="finance-page" hidden>
+
+      <!-- Header keuangan -->
+      <header class="finance-bar">
+        <button id="financeBackBtn" class="icon-btn" title="Kembali">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="finance-bar__info">
+          <h2>Keuangan</h2>
+          <p id="finHeroPeriod" class="finance-bar__sub">Bulan ini</p>
+        </div>
+        <div style="width:42px"></div>
+      </header>
+
+      <!-- Hero: ringkasan saldo -->
+      <div class="finance-hero">
+        <p class="finance-hero__label">Saldo</p>
+        <p class="finance-hero__saldo" id="finSaldo">Rp 0</p>
+        <div class="finance-hero__stats">
+          <div class="finance-hero__stat">
+            <span class="finance-hero__stat-label">↑ Pemasukan</span>
+            <span class="finance-hero__stat-val" id="finTotalIncome">Rp 0</span>
+          </div>
+          <div class="finance-hero__sep"></div>
+          <div class="finance-hero__stat">
+            <span class="finance-hero__stat-label">↓ Pengeluaran</span>
+            <span class="finance-hero__stat-val" id="finTotalExpense">Rp 0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter periode -->
+      <div class="fin-period-tabs" id="finPeriodTabs">
+        <button class="fin-period-tab fin-period-tab--active" data-period="month">Bulan Ini</button>
+        <button class="fin-period-tab" data-period="all">Semua</button>
+      </div>
+
+      <!-- Daftar transaksi -->
+      <div id="transactionsList" class="fin-transactions"></div>
+
+      <!-- Empty state -->
+      <div id="financeEmpty" class="finance-empty">
+        <div class="finance-empty__art">💳</div>
+        <p class="finance-empty__title">Belum ada transaksi</p>
+        <p class="finance-empty__sub">Ketuk + untuk mencatat pengeluaran atau pemasukan pertamamu.</p>
+      </div>
+
+    </div>
+    <!-- ===================== END HALAMAN KEUANGAN ===================== -->
+
+    <!-- Finance Editor (modal bottom sheet) -->
+    <div id="financeEditor" class="fin-editor" hidden>
+      <div class="fin-editor__sheet">
+
+        <!-- Toggle tipe: pemasukan / pengeluaran -->
+        <div class="fin-type-toggle">
+          <button id="finTypeIncomeBtn" class="fin-type-btn fin-type-btn--income fin-type-btn--active" data-type="income">
+            💰 Pemasukan
+          </button>
+          <button id="finTypeExpenseBtn" class="fin-type-btn fin-type-btn--expense" data-type="expense">
+            💸 Pengeluaran
+          </button>
+        </div>
+
+        <!-- Input jumlah -->
+        <div class="fin-amount-wrap">
+          <span class="fin-currency">Rp</span>
+          <input id="finAmountInput" type="number" min="0" step="1" placeholder="0"
+                 class="fin-amount-input" inputmode="numeric" />
+        </div>
+
+        <!-- Keterangan -->
+        <input id="finDescInput" type="text" placeholder="Keterangan (opsional)"
+               class="fin-input" maxlength="100" autocomplete="off" />
+
+        <!-- Pilih kategori -->
+        <div id="finCategoryPicker" class="fin-cat-picker"></div>
+
+        <!-- Tombol aksi -->
+        <div class="fin-editor__actions">
+          <button id="finCancelBtn" class="text-btn">Batal</button>
+          <button id="finSaveBtn" class="btn-filled">Simpan</button>
+        </div>
+
+        <button id="finDeleteBtn" class="delete-btn" hidden>🗑️ Hapus transaksi</button>
+      </div>
+    </div>
+
+    <!-- Finance FAB -->
+    <button id="financeFab" class="finance-fab" title="Tambah transaksi" hidden>
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+
+    <!-- Modal Bluetooth -->
+    <div id="btModal" class="bt-modal" hidden>
+      <div class="bt-sheet">
+        <div class="bt-head">
+          <div class="bt-head__title">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
+            </svg>
+            Bluetooth
+          </div>
+          <button id="btCloseBtn" class="icon-btn" style="font-size:15px">✕</button>
+        </div>
+
+        <p id="btStatus" class="bt-status">Ketuk <strong>Pindai</strong> untuk menemukan perangkat di sekitar Anda.</p>
+
+        <div id="btDeviceCard" class="bt-device-card" hidden>
+          <span class="bt-device-card__icon">📱</span>
+          <div class="bt-device-card__info">
+            <span id="btDeviceName" class="bt-device-card__name"></span>
+            <span class="bt-device-card__meta">🔋 Baterai: <span id="btDeviceBattery">–</span></span>
+          </div>
+          <span class="bt-badge">Terhubung</span>
+        </div>
+
+        <button id="btScanBtn" class="btn-filled btn-filled--block">🔍&nbsp; Pindai Perangkat</button>
+        <button id="btDisconnectBtn" class="text-btn bt-disconnect" hidden>🔌 Putuskan Koneksi</button>
+        <button id="btInsertBtn" class="btn-filled btn-filled--block btn-filled--teal" hidden>📝&nbsp; Catat ke Jurnal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="js/db.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
