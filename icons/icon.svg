@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7f67be"/>
+      <stop offset="1" stop-color="#5b3fa0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <!-- Buku / notebook -->
+  <rect x="150" y="120" width="220" height="272" rx="20" fill="#ffffff"/>
+  <rect x="150" y="120" width="40" height="272" rx="20" fill="#eaddff"/>
+  <circle cx="170" cy="170" r="7" fill="#7f67be"/>
+  <circle cx="170" cy="256" r="7" fill="#7f67be"/>
+  <circle cx="170" cy="342" r="7" fill="#7f67be"/>
+  <!-- Garis tulisan -->
+  <rect x="215" y="170" width="120" height="16" rx="8" fill="#d0bcff"/>
+  <rect x="215" y="212" width="130" height="14" rx="7" fill="#e3e1ec"/>
+  <rect x="215" y="248" width="130" height="14" rx="7" fill="#e3e1ec"/>
+  <rect x="215" y="284" width="95" height="14" rx="7" fill="#e3e1ec"/>
+  <!-- Pena -->
+  <g transform="rotate(40 360 300)">
+    <rect x="348" y="220" width="24" height="150" rx="12" fill="#fbc02d"/>
+    <polygon points="348,370 372,370 360,400" fill="#37352f"/>
+    <rect x="348" y="220" width="24" height="26" rx="12" fill="#ef6c00"/>
+  </g>
+</svg>
