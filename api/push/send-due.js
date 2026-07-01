@@ -22,8 +22,9 @@ module.exports = async (req, res) => {
     const debugInfo = [];
 
     for (const sub of subs) {
-      const notifs = await computeDueNotifications(sub, db, scheduleCache);
-      if (debug) debugInfo.push({ id: sub.id, provinsi: sub.provinsi, kabkota: sub.kabkota, notifs });
+      const trace = debug ? {} : undefined;
+      const notifs = await computeDueNotifications(sub, db, scheduleCache, trace);
+      if (debug) debugInfo.push({ id: sub.id, provinsi: sub.provinsi, kabkota: sub.kabkota, notifs, trace });
       for (const n of notifs) {
         const dedupKey = `${sub.id}:${n.tag}`;
         if (await pushStore.wasSent(dedupKey)) continue;
