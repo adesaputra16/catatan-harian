@@ -57,16 +57,8 @@
       <button id="fab" class="fab" title="Tulis catatan baru" aria-label="Tulis catatan baru">
         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
-      <button id="financeBtn" class="bar-btn" title="Keuangan">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
-        </svg>
-      </button>
-      <button id="btBtn" class="bar-btn" title="Bluetooth">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
-        </svg>
-      </button>
+      <button id="financeBtn" class="bar-btn" title="Keuangan">💰</button>
+      <button id="dzikirBtn" class="bar-btn" title="Dzikir Harian">📿</button>
     </nav>
 
     <!-- Popup pasang ke layar utama -->
@@ -282,6 +274,47 @@
     </div>
     <!-- ===================== END HALAMAN KEUANGAN ===================== -->
 
+    <!-- ===================== HALAMAN DZIKIR HARIAN ===================== -->
+    <div id="dzikirPage" class="dzikir-page" hidden>
+
+      <!-- Header dzikir -->
+      <header class="dzikir-bar">
+        <button id="dzikirBackBtn" class="icon-btn" title="Kembali">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="dzikir-bar__info">
+          <h2>Dzikir Harian</h2>
+          <p class="dzikir-bar__sub">Bacaan pagi, sore &amp; sesudah shalat</p>
+        </div>
+        <div style="width:42px"></div>
+      </header>
+
+      <!-- Tab jenis dzikir -->
+      <div class="dzikir-tabs" id="dzikirTabs">
+        <button class="dzikir-tab dzikir-tab--active" data-type="pagi">🌅 Pagi</button>
+        <button class="dzikir-tab" data-type="sore">🌇 Sore</button>
+        <button class="dzikir-tab" data-type="solat">🕌 Sesudah Shalat</button>
+      </div>
+
+      <!-- Loading -->
+      <div id="dzikirLoading" class="dzikir-loading" hidden>
+        <div class="shalat-spinner"></div>
+        <span>Memuat dzikir…</span>
+      </div>
+
+      <!-- Daftar dzikir -->
+      <div id="dzikirList" class="dzikir-list"></div>
+
+      <!-- Empty state -->
+      <div id="dzikirEmpty" class="dzikir-empty" hidden>
+        <div class="dzikir-empty__art">📿</div>
+        <p class="dzikir-empty__title">Belum ada dzikir</p>
+        <p class="dzikir-empty__sub">Periksa koneksi internet lalu coba lagi.</p>
+      </div>
+
+    </div>
+    <!-- ===================== END DZIKIR PAGE ===================== -->
+
     <!-- Finance Editor (modal bottom sheet) -->
     <div id="financeEditor" class="fin-editor" hidden>
       <div class="fin-editor__sheet">
@@ -325,35 +358,6 @@
       <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
     </button>
 
-    <!-- Modal Bluetooth -->
-    <div id="btModal" class="bt-modal" hidden>
-      <div class="bt-sheet">
-        <div class="bt-head">
-          <div class="bt-head__title">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
-            </svg>
-            Bluetooth
-          </div>
-          <button id="btCloseBtn" class="icon-btn" style="font-size:15px">✕</button>
-        </div>
-
-        <p id="btStatus" class="bt-status">Ketuk <strong>Pindai</strong> untuk menemukan perangkat di sekitar Anda.</p>
-
-        <div id="btDeviceCard" class="bt-device-card" hidden>
-          <span class="bt-device-card__icon">📱</span>
-          <div class="bt-device-card__info">
-            <span id="btDeviceName" class="bt-device-card__name"></span>
-            <span class="bt-device-card__meta">🔋 Baterai: <span id="btDeviceBattery">–</span></span>
-          </div>
-          <span class="bt-badge">Terhubung</span>
-        </div>
-
-        <button id="btScanBtn" class="btn-filled btn-filled--block">🔍&nbsp; Pindai Perangkat</button>
-        <button id="btDisconnectBtn" class="text-btn bt-disconnect" hidden>🔌 Putuskan Koneksi</button>
-        <button id="btInsertBtn" class="btn-filled btn-filled--block btn-filled--teal" hidden>📝&nbsp; Catat ke Jurnal</button>
-      </div>
-    </div>
   </div>
 
   <!-- Toast -->

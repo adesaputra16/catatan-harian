@@ -21,7 +21,6 @@
   let selectedMood = '';
   let searchTerm = '';
   let editingImages = [];   // base64[] foto di sesi edit aktif
-  let btDevice = null;       // perangkat Bluetooth yang sedang terhubung
 
   // ---- State: Keuangan ----
   let transactions = [];
@@ -29,6 +28,12 @@
   let finSelectedType = 'expense';
   let finSelectedCategory = '';
   let finPeriod = 'month';
+
+  // ---- State: Dzikir Harian ----
+  const DZIKIR_API = '/api/dzikir'; // diproksi lewat server.js — API asal tidak mengirim header CORS
+  const DZIKIR_CACHE = 'dzikir_cache_v1';
+  let dzikirAll = null;
+  let dzikirType = 'pagi';
 
   const FIN_CATS = {
     income: [
@@ -699,6 +704,7 @@
       localStorage.setItem(SHALAT_CACHE, JSON.stringify({ provinsi, kabkota, bulan, tahun, data: shalatData }));
       $('shalatCityLabel').textContent = kabkota;
       renderShalatData(shalatData);
+      updatePushLocation();
     } catch (e) {
       showToast('Gagal memuat jadwal: ' + (e.message || 'Periksa koneksi internet'));
       if (!shalatData) $('shalatEmpty').hidden = false;
@@ -813,92 +819,6 @@
     picker.hidden = forceOpen ? false : !wasHidden;
     if (!picker.hidden && shalatProvinsiList.length) populateProvinsiSelect();
     if (!picker.hidden && shalatSelProvinsi) fetchKabkota(shalatSelProvinsi);
-  }
-
-  // ---- Bluetooth ----
-  function openBtModal() {
-    const modal = $('btModal');
-    if (!navigator.bluetooth) {
-      $('btStatus').innerHTML = '⚠️ <strong>Web Bluetooth tidak didukung</strong> di browser ini.<br>Gunakan <strong>Chrome / Edge</strong> di Android atau desktop, pastikan Bluetooth perangkat aktif.';
-      $('btScanBtn').hidden = true;
-    } else {
-      $('btStatus').textContent = 'Ketuk Pindai untuk menemukan perangkat di sekitar Anda.';
-      $('btScanBtn').hidden = false;
-    }
-    modal.hidden = false;
-  }
-
-  function closeBtModal() {
-    $('btModal').hidden = true;
-  }
-
-  function setBtStatus(msg) { $('btStatus').innerHTML = msg; }
-
-  async function btScan() {
-    setBtStatus('🔍 Membuka pemilih perangkat…');
-    $('btDeviceCard').hidden = true;
-    $('btInsertBtn').hidden = true;
-    $('btDisconnectBtn').hidden = true;
-    try {
-      btDevice = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ['battery_service', 'device_information'],
-      });
-
-      setBtStatus(`🔗 Menghubungkan ke <strong>${btDevice.name || 'perangkat'}</strong>…`);
-
-      const server = await btDevice.gatt.connect();
-
-      let battery = '–';
-      try {
-        const svc = await server.getPrimaryService('battery_service');
-        const chr = await svc.getCharacteristic('battery_level');
-        const val = await chr.readValue();
-        battery = val.getUint8(0) + '%';
-      } catch { /* perangkat tidak mendukung layanan baterai */ }
-
-      btDevice.addEventListener('gattserverdisconnected', () => {
-        setBtStatus('🔌 Perangkat terputus.');
-        $('btDeviceCard').hidden = true;
-        $('btDisconnectBtn').hidden = true;
-        $('btInsertBtn').hidden = true;
-      });
-
-      $('btDeviceName').textContent = btDevice.name || 'Perangkat tidak dikenal';
-      $('btDeviceBattery').textContent = battery;
-      $('btDeviceCard').hidden = false;
-      $('btDisconnectBtn').hidden = false;
-      $('btInsertBtn').hidden = false;
-      setBtStatus('✅ Terhubung dengan sukses.');
-    } catch (err) {
-      if (err.name === 'NotFoundError' || err.name === 'AbortError') {
-        setBtStatus('Pemilihan dibatalkan.');
-      } else {
-        setBtStatus(`❌ Gagal terhubung: ${err.message}`);
-      }
-    }
-  }
-
-  function btDisconnect() {
-    if (btDevice && btDevice.gatt.connected) btDevice.gatt.disconnect();
-    btDevice = null;
-    setBtStatus('🔌 Koneksi diputuskan.');
-    $('btDeviceCard').hidden = true;
-    $('btDisconnectBtn').hidden = true;
-    $('btInsertBtn').hidden = true;
-  }
-
-  async function btInsertNote() {
-    if (!btDevice) return;
-    const now = Date.now();
-    const name = $('btDeviceName').textContent;
-    const battery = $('btDeviceBattery').textContent;
-    const title = `📡 ${name}`;
-    const body = `Perangkat: ${name}\nBaterai: ${battery}\nWaktu: ${fmtDateLong(now)} pukul ${fmtTime(now)}`;
-    await DB.put({ id: uid(), title, body, mood: '🙂', images: [], createdAt: now, updatedAt: now });
-    await reload();
-    closeBtModal();
-    showToast('Catatan Bluetooth disimpan 📝');
   }
 
   // ============================================================
@@ -1025,6 +945,85 @@
     setTimeout(() => { page.hidden = true; }, 340);
   }
 
+  // ============================================================
+  // DZIKIR HARIAN
+  // ============================================================
+
+  function dzikirCard(d) {
+    const card = document.createElement('div');
+    card.className = 'dzikir-card';
+
+    const arab = document.createElement('p');
+    arab.className = 'dzikir-card__arab';
+    arab.dir = 'rtl';
+    arab.textContent = d.arab;
+
+    const indo = document.createElement('p');
+    indo.className = 'dzikir-card__indo';
+    indo.textContent = d.indo;
+
+    card.append(arab, indo);
+
+    if (d.ulang) {
+      const badge = document.createElement('span');
+      badge.className = 'dzikir-card__badge';
+      badge.textContent = '🔁 Diulang ' + d.ulang;
+      card.appendChild(badge);
+    }
+    return card;
+  }
+
+  function renderDzikirList() {
+    const list = $('dzikirList');
+    list.innerHTML = '';
+    if (!dzikirAll) return;
+    const items = dzikirAll.filter((d) => d.type === dzikirType);
+    $('dzikirEmpty').hidden = items.length > 0;
+    items.forEach((d) => list.appendChild(dzikirCard(d)));
+  }
+
+  async function fetchDzikirAll() {
+    try {
+      const res = await fetch(DZIKIR_API);
+      const json = await res.json();
+      if (json.status !== 200 || !Array.isArray(json.data)) throw new Error('Format tidak sesuai');
+      dzikirAll = json.data;
+      localStorage.setItem(DZIKIR_CACHE, JSON.stringify(dzikirAll));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function openDzikirPage() {
+    const page = $('dzikirPage');
+    page.hidden = false;
+    requestAnimationFrame(() => page.classList.add('dzikir-page--open'));
+    $('dzikirEmpty').hidden = true;
+
+    if (!dzikirAll) {
+      try { dzikirAll = JSON.parse(localStorage.getItem(DZIKIR_CACHE) || 'null'); } catch { dzikirAll = null; }
+    }
+    renderDzikirList();
+    $('dzikirLoading').hidden = !!dzikirAll;
+
+    fetchDzikirAll().then((ok) => {
+      $('dzikirLoading').hidden = true;
+      if (ok) {
+        renderDzikirList();
+      } else if (!dzikirAll) {
+        $('dzikirEmpty').hidden = false;
+        showToast('Gagal memuat dzikir. Periksa koneksi internet');
+      }
+    });
+  }
+
+  function closeDzikirPage() {
+    const page = $('dzikirPage');
+    page.classList.remove('dzikir-page--open');
+    setTimeout(() => { page.hidden = true; }, 340);
+  }
+
   function updateFinTypeUI() {
     $('finTypeIncomeBtn').classList.toggle('fin-type-btn--active', finSelectedType === 'income');
     $('finTypeExpenseBtn').classList.toggle('fin-type-btn--active', finSelectedType === 'expense');
@@ -1121,19 +1120,21 @@
     if (Notification.permission === 'granted') {
       showToast('Notifikasi sudah aktif 🔔');
       showNotif('Catatan Harian', 'Notifikasi sudah aktif ✓');
+      subscribeToPush();
       return;
     }
     const perm = await Notification.requestPermission();
     updateNotifBtn();
     if (perm === 'granted') {
       showToast('Notifikasi diaktifkan 🔔');
-      showNotif('Catatan Harian', 'Kamu akan diberi tahu saat data berubah dari perangkat lain.');
+      showNotif('Catatan Harian', 'Kamu akan diberi tahu saat data berubah dari perangkat lain, jadwal sholat, dzikir, dan reminder catat keuangan.');
+      subscribeToPush();
     } else {
       showToast('Notifikasi tidak diaktifkan');
     }
   }
 
-  async function showNotif(title, body) {
+  async function showNotif(title, body, tag = 'catatan-harian') {
     if (!notifEnabled()) return;
     try {
       const reg = await navigator.serviceWorker.ready;
@@ -1141,7 +1142,7 @@
         body,
         icon: 'icons/icon-192.png',
         badge: 'icons/icon-192.png',
-        tag: 'catatan-harian',
+        tag,
         renotify: true,
       });
     } catch {
@@ -1179,6 +1180,72 @@
     } else {
       showNotif('Catatan Harian', `${changes.length} perubahan tersinkron dari perangkat lain`);
     }
+  }
+
+  // ============================================================
+  // WEB PUSH — reminder jadwal sholat, dzikir & catat keuangan dikirim
+  // oleh server (lihat api/push/send-due.js), jadi tetap masuk walau
+  // aplikasi tertutup. Berbeda dari notifikasi sinkron (showNotif) yang
+  // hanya berjalan selagi app terbuka.
+  // ============================================================
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+  }
+
+  // Muat lokasi jadwal sholat tersimpan (tanpa membuka halaman Shalat) —
+  // dikirim ke server saat subscribe agar reminder sholat sesuai lokasi.
+  function loadShalatCacheIntoState() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(SHALAT_CACHE) || '{}');
+      if (cached.provinsi && cached.kabkota) {
+        shalatSelProvinsi = cached.provinsi;
+        shalatSelKabkota  = cached.kabkota;
+        if (cached.data) shalatData = cached.data;
+      }
+    } catch { /* abaikan */ }
+  }
+
+  async function sendSubscriptionToServer(subscription) {
+    try {
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription, provinsi: shalatSelProvinsi, kabkota: shalatSelKabkota }),
+      });
+    } catch { /* offline — akan tersubscribe lagi saat online */ }
+  }
+
+  async function subscribeToPush() {
+    if (!notifEnabled() || !('PushManager' in window)) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        const res = await fetch('/api/push/vapid-public-key');
+        const { publicKey } = await res.json();
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+      await sendSubscriptionToServer(sub);
+    } catch (e) {
+      console.warn('Gagal subscribe push:', e.message);
+    }
+  }
+
+  // Perbarui lokasi tersimpan di server untuk subscription yang sudah ada —
+  // dipanggil setiap kali lokasi jadwal sholat berubah.
+  async function updatePushLocation() {
+    if (!notifEnabled() || !('PushManager' in window)) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) await sendSubscriptionToServer(sub);
+    } catch { /* abaikan */ }
   }
 
   // ---- Install prompt (PWA) ----
@@ -1307,18 +1374,21 @@
     fetchShalatJadwal(shalatSelProvinsi, shalatSelKabkota, b, y);
   });
 
-  // Bluetooth
-  $('btBtn').addEventListener('click', openBtModal);
-  $('btCloseBtn').addEventListener('click', closeBtModal);
-  $('btModal').addEventListener('click', (e) => { if (e.target === $('btModal')) closeBtModal(); });
-  $('btScanBtn').addEventListener('click', btScan);
-  $('btDisconnectBtn').addEventListener('click', btDisconnect);
-  $('btInsertBtn').addEventListener('click', btInsertNote);
-
   // ---- Keuangan: event ----
   $('financeBtn').addEventListener('click', openFinancePage);
   $('financeBackBtn').addEventListener('click', closeFinancePage);
   $('financeFab').addEventListener('click', () => openFinanceEditor(null));
+
+  // ---- Dzikir Harian: event ----
+  $('dzikirBtn').addEventListener('click', openDzikirPage);
+  $('dzikirBackBtn').addEventListener('click', closeDzikirPage);
+  $('dzikirTabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.dzikir-tab');
+    if (!btn) return;
+    dzikirType = btn.dataset.type;
+    [...$('dzikirTabs').children].forEach((b) => b.classList.toggle('dzikir-tab--active', b === btn));
+    renderDzikirList();
+  });
 
   $('finTypeIncomeBtn').addEventListener('click', () => {
     finSelectedType = 'income';
@@ -1366,9 +1436,9 @@
     if (e.key === 'Escape') {
       if (!editor.hidden) closeEditor();
       else if (!$('financeEditor').hidden) closeFinanceEditor();
-      else if (!$('btModal').hidden) closeBtModal();
       else if ($('shalatPage').classList.contains('shalat-page--open')) closeShalatPage();
       else if ($('financePage').classList.contains('finance-page--open')) closeFinancePage();
+      else if ($('dzikirPage').classList.contains('dzikir-page--open')) closeDzikirPage();
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !editor.hidden) saveNote();
   });
@@ -1413,9 +1483,11 @@
   // Notifikasi
   updateNotifBtn();
   $('notifBtn').addEventListener('click', requestNotif);
+  loadShalatCacheIntoState();
+  subscribeToPush();
 
   // Sinkron ulang ketika koneksi kembali
-  window.addEventListener('online', () => syncWithServer(false));
+  window.addEventListener('online', () => { syncWithServer(false); subscribeToPush(); });
 
   // ---- Daftarkan service worker ----
   if ('serviceWorker' in navigator) {

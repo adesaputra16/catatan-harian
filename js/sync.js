@@ -159,6 +159,9 @@ const Sync = (() => {
   }
 
   /* ---------- SSE: server → browser real-time ---------- */
+  // Hanya berfungsi di server lokal (server.js). Di Vercel serverless,
+  // /api/events tidak ada — EventSource akan gagal berulang, setelah
+  // beberapa kali gagal beruntun kita alihkan ke polling biasa.
   let es = null;
   function listen(onChange) {
     const handle = async () => {
@@ -169,16 +172,26 @@ const Sync = (() => {
       } catch { /* abaikan */ }
     };
 
+    let pollTimer = null;
+    function startPolling() {
+      if (pollTimer) return;
+      pollTimer = setInterval(handle, 15000);
+    }
+
     if (typeof EventSource !== 'undefined') {
       try {
+        let failures = 0;
         es = new EventSource(`${API_BASE}/api/events`);
-        es.onmessage = handle;         // server mengirim event "data" saat ada perubahan
-        es.onerror = () => { /* EventSource menyambung ulang otomatis */ };
+        es.onmessage = () => { failures = 0; handle(); };
+        es.onerror = () => {
+          failures++;
+          if (failures >= 3) { es.close(); startPolling(); }
+        };
         return;
       } catch { /* jatuh ke polling */ }
     }
-    // Fallback bila SSE tak didukung: polling tiap 5 detik
-    setInterval(handle, 5000);
+    // Fallback bila SSE tak didukung / gagal terus: polling
+    startPolling();
   }
 
   // Sinkron ulang saat koneksi kembali
