@@ -33,7 +33,11 @@ module.exports = async (req, res) => {
     }
 
     const payload = { ok: true, subscriptions: subs.length, sent };
-    if (debug) payload.debug = debugInfo;
+    if (debug) {
+      payload.debug = debugInfo;
+      payload._rawQuery = req.query;
+      payload._nowAfterOverride = new Date(Date.now()).toISOString();
+    }
     res.status(200).json(payload);
   } catch (e) {
     res.status(500).json({ error: e.message });
