@@ -1,0 +1,18 @@
+{
+  "name": "catatan-harian",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Catatan Harian PWA — catatan, keuangan, jadwal sholat, dzikir, dengan sinkronisasi & push notification",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --env-file=.env server.js"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.34.3",
+    "web-push": "^3.6.7"
+  }
+}
