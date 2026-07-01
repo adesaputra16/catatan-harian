@@ -471,56 +471,6 @@ body::before {
 .camera-add-btn:active { transform: scale(.96); }
 .camera-add-btn.limit { opacity: .45; pointer-events: none; }
 
-/* ---- Modal Bluetooth ---- */
-.bt-modal {
-  position: fixed; inset: 0; z-index: 55;
-  background: rgba(20, 10, 40, .46);
-  backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center; padding: 24px;
-  animation: fade .2s ease;
-}
-.bt-sheet {
-  background: var(--surface);
-  width: 100%; max-width: 360px;
-  border-radius: 26px; padding: 22px 20px 24px;
-  display: flex; flex-direction: column; gap: 12px;
-  box-shadow: var(--shadow-lg);
-  animation: popIn .3s cubic-bezier(.2, .9, .2, 1);
-}
-.bt-head {
-  display: flex; align-items: center; justify-content: space-between;
-}
-.bt-head__title {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 17px; font-weight: 800; letter-spacing: -.2px;
-  color: var(--primary);
-}
-.bt-status {
-  font-size: 13.5px; color: var(--on-surface-muted); line-height: 1.5;
-  background: var(--surface-2); border-radius: 12px; padding: 10px 13px;
-}
-.bt-device-card {
-  display: flex; align-items: center; gap: 12px;
-  background: var(--primary-container); border-radius: 16px; padding: 14px;
-  animation: rise .25s ease;
-}
-.bt-device-card__icon { font-size: 28px; line-height: 1; }
-.bt-device-card__info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.bt-device-card__name { font-size: 15px; font-weight: 700; word-break: break-all; }
-.bt-device-card__meta { font-size: 12px; color: var(--on-surface-muted); }
-.bt-badge {
-  font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 20px;
-  background: #22c55e; color: #fff; white-space: nowrap;
-}
-.bt-disconnect {
-  align-self: center; color: var(--danger); font-size: 13.5px;
-}
-.bt-disconnect:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
-.btn-filled--teal {
-  background: linear-gradient(135deg, #10b981, #059669);
-  box-shadow: 0 6px 16px rgba(16, 185, 129, .35);
-}
-
 /* ======================================================
    HALAMAN JADWAL SHALAT
    ====================================================== */
@@ -869,6 +819,93 @@ body::before {
 
 @media (min-width: 480px) {
   .finance-fab { right: calc((100vw - var(--app-w)) / 2 + 20px); }
+}
+
+/* ---- Halaman Dzikir Harian ---- */
+.dzikir-page {
+  position: fixed;
+  inset: 0;
+  max-width: var(--app-w);
+  margin: 0 auto;
+  z-index: 42;
+  background: var(--bg);
+  overflow-y: auto; overflow-x: hidden;
+  padding-bottom: 40px;
+  transform: translateX(100%);
+  transition: transform .32s cubic-bezier(.2, .9, .2, 1);
+}
+.dzikir-page--open { transform: none; }
+
+.dzikir-bar {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px; padding-top: max(14px, env(safe-area-inset-top, 14px));
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid color-mix(in srgb, var(--outline) 60%, transparent);
+}
+.dzikir-bar__info { flex: 1; }
+.dzikir-bar h2 { font-size: 18px; font-weight: 800; letter-spacing: -.3px; }
+.dzikir-bar__sub { font-size: 11.5px; font-weight: 600; color: var(--on-surface-muted); margin-top: 1px; }
+
+.dzikir-tabs {
+  display: flex; gap: 8px; overflow-x: auto;
+  margin: 14px 14px 4px; padding-bottom: 2px;
+  -ms-overflow-style: none; scrollbar-width: none;
+}
+.dzikir-tabs::-webkit-scrollbar { display: none; }
+.dzikir-tab {
+  border: 1.5px solid var(--outline);
+  background: var(--surface); color: var(--on-surface-muted);
+  font-size: 13px; font-weight: 700; font-family: inherit;
+  padding: 7px 16px; border-radius: 20px; cursor: pointer;
+  white-space: nowrap;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.dzikir-tab--active,
+.dzikir-tab:hover {
+  border-color: var(--primary); background: var(--primary-container); color: var(--primary);
+}
+
+.dzikir-loading {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; padding: 50px 24px; color: var(--on-surface-muted); font-size: 14px;
+}
+
+.dzikir-list {
+  padding: 10px 14px 4px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.dzikir-card {
+  background: var(--surface); border: 1px solid var(--outline);
+  border-radius: var(--radius); padding: 18px 18px 14px;
+  box-shadow: var(--shadow-sm);
+  animation: rise .3s ease both;
+}
+.dzikir-card__arab {
+  font-size: 22px; line-height: 1.9; text-align: right;
+  color: var(--on-surface); margin-bottom: 12px;
+}
+.dzikir-card__indo {
+  font-size: 13.5px; line-height: 1.6; color: var(--on-surface-muted);
+}
+.dzikir-card__badge {
+  display: inline-block; margin-top: 10px;
+  font-size: 11.5px; font-weight: 700;
+  background: var(--surface-2); color: var(--on-surface-muted);
+  padding: 3px 10px; border-radius: 20px;
+}
+
+.dzikir-empty {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px; padding: 52px 28px; text-align: center;
+}
+.dzikir-empty__art { font-size: 58px; animation: float 3s ease-in-out infinite; }
+.dzikir-empty__title { font-size: 18px; font-weight: 800; color: var(--on-surface); }
+.dzikir-empty__sub {
+  font-size: 13.5px; color: var(--on-surface-muted);
+  line-height: 1.5; max-width: 280px;
 }
 
 /* ---- Finance Editor (bottom sheet) ---- */

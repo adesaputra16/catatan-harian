@@ -1,2 +1,5 @@
 data/db.json
+data/push-subs.json
 node_modules/
+.env
+.vercel

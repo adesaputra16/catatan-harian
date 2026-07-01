@@ -2,9 +2,14 @@
    - Menyajikan file statis PWA (index.html, css, js, dll.)
    - Menyediakan REST API yang menyimpan SEMUA data ke data/db.json
    Tanpa dependensi eksternal — cukup Node.js bawaan. */
-const http = require('http');
-const fs   = require('fs');
-const path = require('path');
+const http  = require('http');
+const https = require('https');
+const fs    = require('fs');
+const path  = require('path');
+
+const pushStore = require('./lib/pushStore');
+const { sendPush, getPublicKey } = require('./lib/webpush');
+const { computeDueNotifications } = require('./lib/dueReminders');
 
 const PORT     = process.env.PORT || 8080;
 const ROOT     = __dirname;
@@ -133,6 +138,38 @@ function sendJSON(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
+/* ---------- Proksi API eksternal (muslim-api tidak mengirim header CORS,
+   sehingga fetch langsung dari browser diblokir; server yang mengambilkannya) ---------- */
+let dzikirCache   = null;
+let dzikirCacheAt = 0;
+const DZIKIR_TTL  = 6 * 60 * 60 * 1000; // 6 jam — isi dzikir statis, jarang berubah
+
+function fetchDzikirUpstream() {
+  return new Promise((resolve, reject) => {
+    https.get('https://muslim-api-three.vercel.app/v1/dzikir', (upstream) => {
+      let body = '';
+      upstream.on('data', (c) => { body += c; });
+      upstream.on('end', () => {
+        try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
+      });
+    }).on('error', reject);
+  });
+}
+
+async function handleDzikirProxy(res) {
+  if (dzikirCache && (Date.now() - dzikirCacheAt < DZIKIR_TTL)) {
+    return sendJSON(res, 200, dzikirCache);
+  }
+  try {
+    dzikirCache = await fetchDzikirUpstream();
+    dzikirCacheAt = Date.now();
+    return sendJSON(res, 200, dzikirCache);
+  } catch (e) {
+    if (dzikirCache) return sendJSON(res, 200, dzikirCache); // stale, tapi lebih baik daripada error
+    return sendJSON(res, 502, { error: 'Gagal mengambil data dzikir: ' + e.message });
+  }
+}
+
 /* ---------- API ---------- */
 async function handleAPI(req, res, parts) {
   // parts: ['api', store?, id?]
@@ -142,6 +179,43 @@ async function handleAPI(req, res, parts) {
   // GET /api/data → seluruh data
   if (req.method === 'GET' && store === 'data') {
     return sendJSON(res, 200, { notes: db.notes, transactions: db.transactions });
+  }
+
+  // GET /api/dzikir → proksi ke muslim-api (hindari blokir CORS di browser)
+  if (req.method === 'GET' && store === 'dzikir') {
+    return handleDzikirProxy(res);
+  }
+
+  // ---- Web Push ----
+  if (store === 'push') {
+    const action = parts[2];
+
+    if (req.method === 'GET' && action === 'vapid-public-key') {
+      const publicKey = getPublicKey();
+      if (!publicKey) return sendJSON(res, 500, { error: 'VAPID_PUBLIC_KEY belum diset' });
+      return sendJSON(res, 200, { publicKey });
+    }
+
+    if (req.method === 'POST' && action === 'subscribe') {
+      let body;
+      try { body = await readBody(req); } catch { return sendJSON(res, 400, { error: 'JSON tidak valid' }); }
+      const { subscription, provinsi, kabkota } = body || {};
+      if (!subscription || !subscription.endpoint || !subscription.keys) {
+        return sendJSON(res, 400, { error: 'subscription tidak valid' });
+      }
+      const record = await pushStore.saveSubscription({ endpoint: subscription.endpoint, keys: subscription.keys, provinsi, kabkota });
+      return sendJSON(res, 200, { ok: true, id: record.id });
+    }
+
+    if (req.method === 'POST' && action === 'unsubscribe') {
+      let body;
+      try { body = await readBody(req); } catch { return sendJSON(res, 400, { error: 'JSON tidak valid' }); }
+      if (!body || !body.endpoint) return sendJSON(res, 400, { error: 'endpoint wajib diisi' });
+      await pushStore.removeSubscription(body.endpoint);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    return sendJSON(res, 404, { error: 'rute push tidak dikenal' });
   }
 
   // GET /api/events → kanal SSE (server mendorong notifikasi perubahan)
@@ -218,6 +292,28 @@ function watchDataFile() {
     console.warn('Tidak bisa memantau db.json:', e.message);
   }
 }
+
+/* ---------- Reminder terjadwal (simulasi cron untuk pengembangan lokal) ---------- */
+async function checkDueRemindersLocal() {
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return; // belum dikonfigurasi
+  try {
+    const subs = await pushStore.listSubscriptions();
+    if (!subs.length) return;
+    const scheduleCache = new Map();
+    for (const sub of subs) {
+      const notifs = await computeDueNotifications(sub, db, scheduleCache);
+      for (const n of notifs) {
+        const dedupKey = `${sub.id}:${n.tag}`;
+        if (await pushStore.wasSent(dedupKey)) continue;
+        const ok = await sendPush(sub, { title: n.title, body: n.body, tag: n.tag });
+        if (ok) await pushStore.markSent(dedupKey);
+      }
+    }
+  } catch (e) {
+    console.error('Gagal cek reminder lokal:', e.message);
+  }
+}
+setInterval(checkDueRemindersLocal, 5 * 60 * 1000);
 
 /* ---------- Server ---------- */
 loadDB();
